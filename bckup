@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+CONFIG_FILE="${HOME}/.config/borg-backup/excludes"
+REPO="${HOME}/backup/repo"
+
+# --- Date formatting ---
+
+DAY_NAME=$(date +%A)
+DAY_NUM=$(date +%-d)
+MONTH_NAME_LOWER=$(date +%B | tr '[:upper:]' '[:lower:]')
+YEAR=$(date +%y)
+
+get_ordinal() {
+    local n=$1
+    if (( n == 11 || n == 12 || n == 13 )); then echo "th"
+    elif (( n % 10 == 1 )); then echo "st"
+    elif (( n % 10 == 2 )); then echo "nd"
+    elif (( n % 10 == 3 )); then echo "rd"
+    else echo "th"
+    fi
+}
+
+ORDINAL=$(get_ordinal "$DAY_NUM")
+ARCHIVE_NAME="${DAY_NAME}-${DAY_NUM}${ORDINAL}-of-${MONTH_NAME_LOWER}-${YEAR}"
+
+# --- Helper functions ---
+
+usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --exclude <path>     Add a path to the permanent exclude list"
+    echo "  --dontexclude <path>  Remove a path from the permanent exclude list"
+    echo "  --list-excludes          Show all currently excluded paths"
+    echo "  --help                   Show this help message"
+    echo ""
+    echo "Without any options, runs a backup with all configured excludes."
+    echo ""
+    echo "Config file: $CONFIG_FILE"
+    echo "Repository:  $REPO"
+    echo "Archive name will be: $ARCHIVE_NAME"
+    exit 0
+}
+
+ensure_config_dir() {
+    local dir
+    dir=$(dirname "$CONFIG_FILE")
+    if [[ ! -d "$dir" ]]; then
+        mkdir -p "$dir"
+    fi
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        touch "$CONFIG_FILE"
+    fi
+}
+
+exclude() {
+    local path="$1"
+    ensure_config_dir
+    if grep -qxF "$path" "$CONFIG_FILE"; then
+        echo "Already in exclude list: $path"
+    else
+        echo "$path" >> "$CONFIG_FILE"
+        echo "Added to exclude list: $path"
+    fi
+}
+
+dont_exclude() {
+    local path="$1"
+    ensure_config_dir
+    if ! grep -qxF "$path" "$CONFIG_FILE"; then
+        echo "Not found in exclude list: $path"
+        return 1
+    fi
+    local tmpfile
+    tmpfile=$(mktemp)
+    grep -vxF "$path" "$CONFIG_FILE" > "$tmpfile" || true
+    mv "$tmpfile" "$CONFIG_FILE"
+    echo "Removed from exclude list: $path"
+}
+
+list_excludes() {
+    ensure_config_dir
+    echo "Current exclude list ($CONFIG_FILE):"
+    echo "--------------------------------------"
+    if [[ ! -s "$CONFIG_FILE" ]]; then
+        echo "(empty — no excludes configured)"
+    else
+        cat "$CONFIG_FILE"
+    fi
+}
+
+build_exclude_args() {
+    ensure_config_dir
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ -z "$line" ]] && continue
+        [[ "$line" == \#* ]] && continue
+        printf '%s\0' "--exclude" "$line"
+    done < "$CONFIG_FILE"
+}
+
+# --- Argument parsing ---
+
+case "${1:-}" in
+    --help)            usage ;;
+    --exclude)
+        if [[ -z "${2:-}" ]]; then echo "Error: --add-exclude requires a path argument"; exit 1; fi
+        exclude "$2"; exit 0 ;;
+    --dont-exclude)
+        if [[ -z "${2:-}" ]]; then echo "Error: --remove-exclude requires a path argument"; exit 1; fi
+        dont_exclude "$2"; exit 0 ;;
+    --list-excludes)   list_excludes; exit 0 ;;
+    "")                : ;;
+    *)                 echo "Unknown option: $1"; usage ;;
+esac
+
+# --- Run the backup ---
+
+echo "Starting backup: ${REPO}::${ARCHIVE_NAME}"
+echo "Date: $(date)"
+echo ""
+echo "Excludes in effect:"
+
+mapfile -d $'\0' EXCLUDE_ARGS < <(
+    for path in \
+        '/dev/*' '/proc/*' '/sys/*' '/tmp/*' '/run/*' \
+        '/mnt/*' '/media/*' '/var/cache/*' '/var/tmp/*' \
+        "${HOME}/.cache/*"; do
+        printf '%s\0' "--exclude" "$path"
+        echo "  [default] $path" >&2
+    done
+    build_exclude_args
+)
+
+echo ""
+
+sudo borg create \
+    --stats \
+    --progress \
+    "${REPO}::${ARCHIVE_NAME}" \
+    / \
+    "${EXCLUDE_ARGS[@]}"
+
+echo ""
+echo "Backup complete: ${REPO}::${ARCHIVE_NAME}"
