@@ -21,12 +21,31 @@ DAY_NUM=$(date +%-d)
 MONTH_NAME_LOWER=$(date +%B | tr '[:upper:]' '[:lower:]')
 YEAR=$(date +%y)
 
+prompt_new_passphrase() {
+    read -rsp "Set passphrase for new repo (leave blank for none): " BORG_PASSPHRASE
+    echo ""
+    if [[ -n "$BORG_PASSPHRASE" ]]; then
+        read -rsp "Confirm passphrase: " passphrase_confirm
+        echo ""
+        if [[ "$BORG_PASSPHRASE" != "$passphrase_confirm" ]]; then
+            echo "Passphrases do not match, aborting."
+            exit 1
+        fi
+    fi
+    export BORG_PASSPHRASE
+}
+
 ensure_repo() {
     local repo="$1"
     if [[ ! -d "$repo" ]]; then
         echo "No repo found at $repo, initialising..."
         mkdir -p "$repo"
-        sudo borg init --encryption=none "$repo"
+        prompt_new_passphrase
+        if [[ -n "$BORG_PASSPHRASE" ]]; then
+            sudo -E borg init --encryption=repokey "$repo"
+        else
+            sudo borg init --encryption=none "$repo"
+        fi
     fi
 }
 
@@ -75,13 +94,29 @@ set_repo() {
 }
 
 prompt_passphrase() {
-    # Borg reads BORG_PASSPHRASE from the environment
     if [[ -z "${BORG_PASSPHRASE:-}" ]]; then
-        read -rsp "Passphrase for repo (leave blank if none): " BORG_PASSPHRASE
+        read -rsp "Passphrase for repo (press enter to skip): " BORG_PASSPHRASE
         echo ""
         export BORG_PASSPHRASE
     fi
 }
+
+change_password() {
+    local new_pass="$1"
+    read -rsp "Current passphrase (press enter if none): " old_pass
+    echo ""
+
+    # Find all borg repos under BASE_REPO by looking for their config file
+    while IFS= read -r -d '' config_file; do
+        local repo
+        repo=$(dirname "$config_file")
+        echo "Updating passphrase for $repo..."
+        BORG_PASSPHRASE="$old_pass" BORG_NEW_PASSPHRASE="$new_pass" sudo -E borg key change-passphrase "$repo"
+    done < <(find "$BASE_REPO" -name "config" -print0)
+
+    echo "All repo's updated."
+}
+
 get_ordinal() {
     local n=$1
     if (( n == 11 || n == 12 || n == 13 )); then echo "th"
@@ -107,6 +142,7 @@ usage() {
     echo "  --help                   Show this help message"
     echo "  --repo <path>        Permanently store the repo base path"
     echo "Without any options, runs a backup with all configured excludes."
+    echo "  --password <passkey>    Change the passphrase on all repo's"
     echo ""
     echo "Config file: $CONFIG_FILE"
     echo "Repository:  $BASE_REPO"
@@ -186,6 +222,11 @@ case "${1:-}" in
     --repo)
         if [[ -z "${2:-}" ]]; then echo "Error: --repo requires a path argument"; exit 1; fi
         set_repo "$2"; exit 0 ;;
+    --password=*)
+        change_password "${1#--password=}"; exit 0 ;;
+    --password)
+        if [[ -z "${2:-}" ]]; then echo "Error: --password requires a new password argument"; exit 1; fi
+        change_password "$2"; exit 0 ;;
     "")                : ;;
     *)                 echo "Unknown option: $1"; usage ;;
 esac
