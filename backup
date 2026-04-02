@@ -21,6 +21,32 @@ DAY_NUM=$(date +%-d)
 MONTH_NAME_LOWER=$(date +%B | tr '[:upper:]' '[:lower:]')
 YEAR=$(date +%y)
 
+repo_is_unencrypted() {
+    local repo="$1"
+    local mode
+    mode=$(sudo borg info --json "$repo" 2>/dev/null \
+        | python3 -c "import sys,json; print(json.load(sys.stdin)['encryption']['mode'])" 2>/dev/null \
+        || echo "unknown")
+    [[ "$mode" == "none" ]]
+}
+
+convert_repo_to_encrypted() {
+    local repo="$1"
+    local new_pass="$2"
+    local tmp_repo="${repo}.encrypted-tmp"
+
+    echo "  Converting $repo to encrypted..."
+    mkdir -p "$tmp_repo"
+    BORG_PASSPHRASE="$new_pass" sudo -E borg init --encryption=repokey "$tmp_repo"
+    BORG_PASSPHRASE="" BORG_PASSPHRASE_NEW="$new_pass" sudo -E borg transfer \
+        --from-repo "$repo" \
+        "$tmp_repo" \
+        || { echo "  Failed to transfer $repo, aborting conversion."; rm -rf "$tmp_repo"; return 1; }
+    sudo rm -rf "$repo"
+    sudo mv "$tmp_repo" "$repo"
+    echo "  Converted $repo successfully."
+}
+
 prompt_new_passphrase() {
     read -rsp "Set passphrase for new repo (leave blank for none): " BORG_PASSPHRASE
     echo ""
@@ -106,15 +132,23 @@ change_password() {
     read -rsp "Current passphrase (press enter if none): " old_pass
     echo ""
 
-    # Find all borg repos under BASE_REPO by looking for their config file
     while IFS= read -r -d '' config_file; do
         local repo
         repo=$(dirname "$config_file")
-        echo "Updating passphrase for $repo..."
-        BORG_PASSPHRASE="$old_pass" BORG_NEW_PASSPHRASE="$new_pass" sudo -E borg key change-passphrase "$repo"
+        echo "Processing $repo..."
+        if repo_is_unencrypted "$repo"; then
+            if [[ -n "$new_pass" ]]; then
+                convert_repo_to_encrypted "$repo" "$new_pass"
+            else
+                echo "  Skipped $repo (already unencrypted, no passphrase given)"
+            fi
+        else
+            BORG_PASSPHRASE="$old_pass" BORG_NEW_PASSPHRASE="$new_pass" sudo -E borg key change-passphrase "$repo" \
+                || echo "  Failed to update passphrase for $repo"
+        fi
     done < <(find "$BASE_REPO" -name "config" -print0)
 
-    echo "All repo's updated."
+    echo "Done."
 }
 
 get_ordinal() {
