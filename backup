@@ -96,14 +96,14 @@ usage() {
     echo ""
     echo "Options:"
     echo "  --exclude <path>     Add a path to the permanent exclude list"
-    echo "  --dontexclude <path>  Remove a path from the permanent exclude list"
+    echo "  --dont-exclude <path>  Remove a path from the permanent exclude list"
     echo "  --list-excludes          Show all currently excluded paths"
     echo "  --help                   Show this help message"
-    echo "  --repo=N                  default to repo N"
+    echo "  --repo <path>        Permanently store the repo base path"
     echo "Without any options, runs a backup with all configured excludes."
     echo ""
     echo "Config file: $CONFIG_FILE"
-    echo "Repository:  $REPO"
+    echo "Repository:  $BASE_REPO"
     echo "Archive name will be: $ARCHIVE_NAME"
     exit 0
 }
@@ -185,6 +185,9 @@ case "${1:-}" in
 esac
 
 # --- Run the backup ---
+prompt_source_dir
+REPO=$(get_repo_for_source "$SOURCE_DIR")
+ensure_repo "$REPO"
 
 echo "Starting backup: ${REPO}::${ARCHIVE_NAME}"
 echo "Date: $(date)"
