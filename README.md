@@ -1,5 +1,5 @@
 # Backup
-Backup is a basic wrapper to make borgmatic more convenient, it is currently only for full whole-system backups and has few features as it is in early development. It currently expects your repo to be in ~/backup/repo, the excluding is currently permanent only. The backup names are always date-based.
+Backup is a basic bash wrapper to make borgmatic more convenient, it is currently only for full whole-system backups and has few features as it is in early development. It currently expects your repo to be in ~/backup/repo, the excluding is currently permanent only. The backup names are always date-based.
 The options to use your own repo name, choose the backup directory instead of always root, have session-specific as well as permanent excludes, automatic backups available if wanted, your own filename if wanted & automatic descriptions of the differences of each backup in files are all in beta and with little development currently.
 
 # Usage
