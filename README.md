@@ -3,16 +3,20 @@ Backup is a basic bash wrapper to make borgmatic more convenient, it is currentl
 The options to use your own repo name, choose the backup directory instead of always root, have session-specific as well as permanent excludes, automatic backups available if wanted, your own filename if wanted & automatic descriptions of the differences of each backup in files are all in beta and with little development currently.
 
 # Usage
-to exclude a specific directory permanently the syntax is:
+to add a repo permanently, the syntax is:
+```bash
+backup --repo=<repo>
+```
+to exclude a specific directory permanently, the syntax is:
 
 ```bash
 backup --exclude '/dir'
 ```
-to remove an exclude permanently the syntax is:
+to remove an exclude permanently, the syntax is:
 ```bash
 backup --dont-exclude '/dir'
 ```
-to list the excludes the syntax is:
+to list the excludes, the syntax is:
 ```bash
 backup --list-excludes
 ```
