@@ -6,7 +6,14 @@
 set -euo pipefail
 
 CONFIG_FILE="${HOME}/.config/borg-backup/excludes"
-REPO="${HOME}/backup/repo"
+REPO_FILE="${HOME}/.config/borg-backup/repo"
+
+# Load repo from stored config, fall back to default
+if [[ -f "$REPO_FILE" ]]; then
+    REPO=$(cat "$REPO_FILE")
+else
+    REPO="${HOME}/backup/repo"
+fi
 
 # --- Date formatting ---
 
@@ -15,6 +22,21 @@ DAY_NUM=$(date +%-d)
 MONTH_NAME_LOWER=$(date +%B | tr '[:upper:]' '[:lower:]')
 YEAR=$(date +%y)
 
+set_repo() {
+    local path="$1"
+    ensure_config_dir
+    echo "$path" > "$REPO_FILE"
+    echo "Repo set to: $path"
+}
+
+prompt_passphrase() {
+    # Borg reads BORG_PASSPHRASE from the environment
+    if [[ -z "${BORG_PASSPHRASE:-}" ]]; then
+        read -rsp "Passphrase for repo (leave blank if none): " BORG_PASSPHRASE
+        echo ""
+        export BORG_PASSPHRASE
+    fi
+}
 get_ordinal() {
     local n=$1
     if (( n == 11 || n == 12 || n == 13 )); then echo "th"
@@ -38,7 +60,7 @@ usage() {
     echo "  --dontexclude <path>  Remove a path from the permanent exclude list"
     echo "  --list-excludes          Show all currently excluded paths"
     echo "  --help                   Show this help message"
-    echo ""
+    echo "  --repo=N                  default to repo N"
     echo "Without any options, runs a backup with all configured excludes."
     echo ""
     echo "Config file: $CONFIG_FILE"
@@ -114,6 +136,11 @@ case "${1:-}" in
         if [[ -z "${2:-}" ]]; then echo "Error: --remove-exclude requires a path argument"; exit 1; fi
         dont_exclude "$2"; exit 0 ;;
     --list-excludes)   list_excludes; exit 0 ;;
+    --repo=*)
+        set_repo "${1#--repo=}"; exit 0 ;;
+    --repo)
+        if [[ -z "${2:-}" ]]; then echo "Error: --repo requires a path argument"; exit 1; fi
+        set_repo "$2"; exit 0 ;;
     "")                : ;;
     *)                 echo "Unknown option: $1"; usage ;;
 esac
@@ -137,6 +164,8 @@ mapfile -d $'\0' EXCLUDE_ARGS < <(
 )
 
 echo ""
+
+prompt_passphrase
 
 sudo borg create \
     --stats \
