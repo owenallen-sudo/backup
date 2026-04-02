@@ -22,6 +22,19 @@ DAY_NUM=$(date +%-d)
 MONTH_NAME_LOWER=$(date +%B | tr '[:upper:]' '[:lower:]')
 YEAR=$(date +%y)
 
+prompt_archive_name() {
+    echo "Default archive name: ${ARCHIVE_NAME}"
+    read -rp "Use default? [y/n]: " choice
+    if [[ "$choice" == "n" || "$choice" == "N" ]]; then
+        read -rp "Enter archive name: " custom_name
+        if [[ -z "$custom_name" ]]; then
+            echo "No name entered, using default."
+        else
+            ARCHIVE_NAME="$custom_name"
+        fi
+    fi
+}
+
 set_repo() {
     local path="$1"
     ensure_config_dir
@@ -164,6 +177,8 @@ mapfile -d $'\0' EXCLUDE_ARGS < <(
 )
 
 echo ""
+
+prompt_archive_name
 
 prompt_passphrase
 
