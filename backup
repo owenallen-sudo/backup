@@ -8,11 +8,10 @@ set -euo pipefail
 CONFIG_FILE="${HOME}/.config/borg-backup/excludes"
 REPO_FILE="${HOME}/.config/borg-backup/repo"
 
-# Load repo from stored config, fall back to default
 if [[ -f "$REPO_FILE" ]]; then
-    REPO=$(cat "$REPO_FILE")
+    BASE_REPO=$(cat "$REPO_FILE")
 else
-    REPO="${HOME}/backup/repo"
+    BASE_REPO="${HOME}/backup/repos"
 fi
 
 # --- Date formatting ---
@@ -21,6 +20,33 @@ DAY_NAME=$(date +%A)
 DAY_NUM=$(date +%-d)
 MONTH_NAME_LOWER=$(date +%B | tr '[:upper:]' '[:lower:]')
 YEAR=$(date +%y)
+
+ensure_repo() {
+    local repo="$1"
+    if [[ ! -d "$repo" ]]; then
+        echo "No repo found at $repo, initialising..."
+        mkdir -p "$repo"
+        sudo borg init --encryption=none "$repo"
+    fi
+}
+
+prompt_source_dir() {
+    read -rp "Directory to back up (e.g. /, /home, /usr/bin/): " SOURCE_DIR
+    if [[ -z "$SOURCE_DIR" ]]; then
+        echo "No directory entered, defaulting to /"
+        SOURCE_DIR="/"
+    fi
+    if [[ ! -d "$SOURCE_DIR" ]]; then
+        echo "Error: $SOURCE_DIR does not exist"
+        exit 1
+    fi
+}
+get_repo_for_source() {
+    local source="$1"
+    # Strip leading slash, append to base so /home/ becomes $BASE_REPO/home/
+    local relative="${source#/}"
+    echo "${BASE_REPO}/${relative}"
+}
 
 prompt_archive_name() {
     echo "Default archive name: ${ARCHIVE_NAME}"
@@ -181,13 +207,11 @@ echo ""
 prompt_archive_name
 
 prompt_passphrase
-
-sudo borg create \
+sudo -E borg create \
     --stats \
     --progress \
     "${REPO}::${ARCHIVE_NAME}" \
-    / \
+    "$SOURCE_DIR" \
     "${EXCLUDE_ARGS[@]}"
-
 echo ""
 echo "Backup complete: ${REPO}::${ARCHIVE_NAME}"
