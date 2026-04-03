@@ -21,6 +21,58 @@ DAY_NUM=$(date +%-d)
 MONTH_NAME_LOWER=$(date +%B | tr '[:upper:]' '[:lower:]')
 YEAR=$(date +%y)
 
+get_previous_archive() {
+    local repo="$1"
+    local current="$2"
+    sudo -E borg list --short "$repo" 2>/dev/null \
+        | grep -v "^${current}$" \
+        | tail -1
+}
+
+generate_changelog_entry() {
+    local repo="$1"
+    local previous="$2"
+    local current="$3"
+    local changelog="${repo}/backup-changelog.txt"
+
+    local diff_output
+    diff_output=$(BORG_PASSPHRASE="$BORG_PASSPHRASE" sudo -E borg diff \
+        "${repo}::${previous}" "$current" 2>/dev/null)
+
+    {
+        echo "========================================"
+        echo "Archive: $current"
+        echo "Date: $(date)"
+        echo "Previous: $previous"
+        echo "----------------------------------------"
+
+        local added removed modified
+        added=$(echo "$diff_output"    | grep -c '^added '    || true)
+        removed=$(echo "$diff_output"  | grep -c '^removed '  || true)
+        modified=$(echo "$diff_output" | grep -c '^modified ' || true)
+        echo "Files added: $added | removed: $removed | modified: $modified"
+        echo ""
+
+        echo "New systemd services:"
+        echo "$diff_output" | grep '^added ' | grep -E '\.service$' \
+            | awk '{print "  + "$NF}' || echo "  (none)"
+        echo ""
+
+        echo "Removed systemd services:"
+        echo "$diff_output" | grep '^removed ' | grep -E '\.service$' \
+            | awk '{print "  - "$NF}' || echo "  (none)"
+        echo ""
+
+        echo "Modified config files:"
+        echo "$diff_output" | grep '^modified ' | grep -E '^modified .*(\.conf|\.cfg|\.ini|\.toml|\.yaml|\.yml)' \
+            | awk '{print "  ~ "$NF}' || echo "  (none)"
+        echo ""
+
+    } >> "$changelog"
+
+    echo "Changelog updated: $changelog"
+}
+
 prompt_new_passphrase() {
     read -rsp "Set passphrase for new repo (leave blank for none): " BORG_PASSPHRASE
     echo ""
@@ -265,4 +317,10 @@ sudo -E borg create \
     "$SOURCE_DIR" \
     "${EXCLUDE_ARGS[@]}"
 echo ""
+PREVIOUS_ARCHIVE=$(get_previous_archive "$REPO" "$ARCHIVE_NAME")
+if [[ -n "$PREVIOUS_ARCHIVE" ]]; then
+    generate_changelog_entry "$REPO" "$PREVIOUS_ARCHIVE" "$ARCHIVE_NAME"
+else
+    echo "No previous archive to diff against, skipping changelog."
+fi
 echo "Backup complete: ${REPO}::${ARCHIVE_NAME}"
