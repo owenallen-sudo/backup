@@ -55,7 +55,7 @@ You will be prompted for the current passphrase. Press enter if repos are curren
 Repos are organised under the base repo path by source directory. For example:
 - A backup of `/` goes to `<base>/full-system-backup/`
 - A backup of `/home` goes to `<base>/home/`
-- A backup of `/home/owen/.config` goes to `<base>/home/owen/.config/`
+- A backup of `~/.config` goes to `<base>/home/<user>/.config/`
 
 # Changelog
 After each backup (from the second backup of a given repo onwards), a `backup-changelog.txt` file is automatically created and appended to inside the repo directory. It records the archive name, date, number of files added/removed/modified, new and removed systemd services, and modified config files.
