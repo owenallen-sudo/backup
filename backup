@@ -38,7 +38,7 @@ convert_repo_to_encrypted() {
     echo "  Converting $repo to encrypted..."
     mkdir -p "$tmp_repo"
     BORG_PASSPHRASE="$new_pass" sudo -E borg init --encryption=repokey "$tmp_repo"
-    BORG_PASSPHRASE="" BORG_PASSPHRASE_NEW="$new_pass" sudo -E borg transfer \
+    BORG_PASSPHRASE="" BORG_NEW_PASSPHRASE="$new_pass" sudo -E borg transfer \
         --from-repo "$repo" \
         "$tmp_repo" \
         || { echo "  Failed to transfer $repo, aborting conversion."; rm -rf "$tmp_repo"; return 1; }
@@ -169,14 +169,15 @@ ARCHIVE_NAME="${DAY_NAME}-${DAY_NUM}${ORDINAL}-of-${MONTH_NAME_LOWER}-${YEAR}"
 usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
-    echo "Options:"
-    echo "  --exclude <path>     Add a path to the permanent exclude list"
-    echo "  --dont-exclude <path>  Remove a path from the permanent exclude list"
-    echo "  --list-excludes          Show all currently excluded paths"
-    echo "  --help                   Show this help message"
-    echo "  --repo <path>        Permanently store the repo base path"
     echo "Without any options, runs a backup with all configured excludes."
-    echo "  --password <passkey>    Change the passphrase on all repo's"
+    echo ""
+    echo "Options:"
+    echo "  --exclude <path>       Add a path to the permanent exclude list"
+    echo "  --dont-exclude <path>  Remove a path from the permanent exclude list"
+    echo "  --list-excludes        Show all currently excluded paths"
+    echo "  --repo <path>          Permanently store the repo base path"
+    echo "  --password <passkey>   Change the passphrase on all repos"
+    echo "  --help                 Show this help message"
     echo ""
     echo "Config file: $CONFIG_FILE"
     echo "Repository:  $BASE_REPO"
