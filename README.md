@@ -1,7 +1,9 @@
 # Backup
 Backup is a basic bash wrapper to make borgmatic more convenient, it is currently only for full whole-system backups and has few features as it is in early development. I have recently added features for using a custom repo name and for using a custom filename but they have not been thoroughly tested. The excluding is currently permanent only. The default backup names are always date-based.
 The options to choose the backup directory instead of always root, have session-specific as well as permanent excludes, automatic backups available if wanted & automatic descriptions of the differences of each backup in README or DESCRIPTION files are all in beta and with little development currently.
-The main branch is for borg 2.x, for borg 1.x, go to the borg 1.x branch but get reduced features.
+This branch has slightly reduced features to be fully compatible with borg 1.x
+rather than requiring borg 2.x, if on borg 2.x I recommend seeing main branch.
+This branch has little encrypted repo support, that is currently only in the main branch
 
 # Usage
 to add a repo permanently, the syntax is:
