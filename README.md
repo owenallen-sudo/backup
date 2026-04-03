@@ -1,33 +1,74 @@
 # Backup
-Backup is a basic bash wrapper to make borgmatic more convenient, it is currently only for full whole-system backups and has few features as it is in early development. I have recently added features for using a custom repo name and for using a custom filename but they have not been thoroughly tested. The excluding is currently permanent only. The default backup names are always date-based.
-The options to choose the backup directory instead of always root, have session-specific as well as permanent excludes, automatic backups available if wanted & automatic descriptions of the differences of each backup in README or DESCRIPTION files are all in beta and with little development currently.
-The main branch is for borg 2.x, for borg 1.x, go to the borg 1.x branch but get reduced features.
+Backup is a bash wrapper for borg to make creating and managing backups more convenient. It supports backing up any directory (not just root), per-repo encryption, custom or date-based archive names, permanent exclude lists, automatic changelog generation between backups, and passphrase management across all repos.
+
+The main branch targets borg 2.x. For borg 1.x, switch to the borg-1.x branch — it has reduced features as `borg transfer` and unencrypted-to-encrypted repo conversion are not available in borg 1.x.
+
+# Dependencies
+- `borg` 2.x (main branch) or `borg` 1.x (borg-1.x branch)
+- `python3` (used for parsing repo encryption info)
+- `sudo`
 
 # Usage
-to add a repo permanently, the syntax is:
-```bash
-backup --repo=<repo>
-```
-to exclude a specific directory permanently, the syntax is:
 
-```bash
-backup --exclude '/dir'
-```
-to remove an exclude permanently, the syntax is:
-```bash
-backup --dont-exclude '/dir'
-```
-to list the excludes, the syntax is:
-```bash
-backup --list-excludes
-```
-then to actually backup syntax is:
+Run a backup:
 ```bash
 backup
 ```
-when it backups, it currently always gives you an automatic filename based on date, an example is provided below:
-```bash
-1st-of-april
+You will be prompted for the directory to back up, whether to use the default date-based archive name, and the repo passphrase if one is set. On the first backup of a directory, you will also be prompted to set a passphrase for the new repo (leave blank for no encryption).
+
+The default archive name is date-based, for example:
 ```
+Monday-7th-of-april-25
+```
+
+Set the base repo path permanently:
+```bash
+backup --repo <path>
+# or
+backup --repo=<path>
+```
+
+Add a permanent exclude:
+```bash
+backup --exclude '/path/to/dir'
+```
+
+Remove a permanent exclude:
+```bash
+backup --dont-exclude '/path/to/dir'
+```
+
+List all permanent excludes:
+```bash
+backup --list-excludes
+```
+
+Change the passphrase on all repos (will also convert unencrypted repos to encrypted if a new passphrase is given):
+```bash
+backup --password <newpassphrase>
+# or
+backup --password=<newpassphrase>
+```
+You will be prompted for the current passphrase. Press enter if repos are currently unencrypted.
+
+# Repo structure
+Repos are organised under the base repo path by source directory. For example:
+- A backup of `/` goes to `<base>/full-system-backup/`
+- A backup of `/home` goes to `<base>/home/`
+- A backup of `/home/owen/.config` goes to `<base>/home/owen/.config/`
+
+# Changelog
+After each backup (from the second backup of a given repo onwards), a `backup-changelog.txt` file is automatically created and appended to inside the repo directory. It records the archive name, date, number of files added/removed/modified, new and removed systemd services, and modified config files.
+
+# Default excludes
+The following paths are always excluded regardless of the permanent exclude list:
+`/dev/*`, `/proc/*`, `/sys/*`, `/tmp/*`, `/run/*`, `/mnt/*`, `/media/*`, `/var/cache/*`, `/var/tmp/*`, `~/.cache/*`
+
+# Config files
+| File | Purpose |
+|------|---------|
+| `~/.config/borg-backup/excludes` | Permanent exclude list |
+| `~/.config/borg-backup/repo` | Stored base repo path |
+
 # Licensing
-This project is licensed under the Mozilla Public License V. 2.0. Any modified version of my iwmenu.c file that gets distributed must remain under this license and stay open-source due to legal rights. Please see the LICENSE file or https://mozilla.org/MPL/2.0/. for the full terms. Other users are free to modify and distribute this file if they follow the MPL 2.0 licensing agreements.
+This project is licensed under the Mozilla Public License v2.0. Any modified version of files in this project that gets distributed must remain under this license and stay open-source. See the LICENSE file or https://mozilla.org/MPL/2.0/ for the full terms.this file if they follow the MPL 2.0 licensing agreements.
