@@ -117,8 +117,8 @@ ensure_repo() {
     local repo="$1"
     if [[ ! -d "$repo" ]]; then
         echo "No repo found at $repo, initialising..."
-        mkdir -p "$repo"
         prompt_new_passphrase
+        mkdir -p "$repo"
         if [[ -n "$BORG_PASSPHRASE" ]]; then
             sudo -E borg init --encryption=repokey "$repo"
         else
